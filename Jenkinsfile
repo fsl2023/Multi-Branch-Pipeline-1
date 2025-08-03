@@ -43,7 +43,7 @@ pipeline {
                 }
             }
             steps {
-                withSonarQubeEnv('SonarQube-Server') {
+                withSonarQubeEnv('SonarQubeServer') {
                     sh 'mvn sonar:sonar -Dsonar.projectKey=my-project'
                 }
             }
