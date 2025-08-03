@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME}"
-        DOCKER_IMAGE = "fsl2023/myapp4AUG25:${env.BRANCH_NAME}"
+        DOCKER_IMAGE = "fsl2023/myapp4august25:${env.BRANCH_NAME}"
     }
 
     stages {
