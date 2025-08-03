@@ -1,5 +1,16 @@
 pipeline {
     agent any
+
+    tools {
+        maven 'M3'
+        jdk 'jdk17'
+    }
+
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME}"
+        DOCKER_IMAGE = "fsl2023/myapp4AUG25:${env.BRANCH_NAME}"
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -9,29 +20,73 @@ pipeline {
 
         stage('Build') {
             steps {
-                sh 'mvn clean package'
+                sh 'mvn clean package -DskipTests'
             }
         }
 
-        stage('Test') {
+        stage('Unit Tests') {
+            when {
+                not {
+                    branch 'main'
+                }
+            }
             steps {
                 sh 'mvn test'
             }
         }
 
-        stage('Code Coverage (JaCoCo)') {
+        stage('SonarQube Analysis') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
             steps {
-                sh 'mvn jacoco:report'
+                withSonarQubeEnv('SonarQube-Server') {
+                    sh 'mvn sonar:sonar -Dsonar.projectKey=my-project'
+                }
             }
         }
-    }
 
-    post {
-        success {
-            echo 'Pipeline completed successfully.'
+        stage('Quality Gate') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
         }
-        failure {
-            echo 'Pipeline failed.'
+
+        stage('Docker Build') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                }
+            }
+            steps {
+                sh "docker build -t $DOCKER_IMAGE ."
+            }
+        }
+
+        stage('Docker Push') {
+            when {
+                branch 'main'
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $DOCKER_IMAGE
+                    """
+                }
+            }
         }
     }
 }
